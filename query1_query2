@@ -1,0 +1,219 @@
+-- Query 1
+
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query1;
+CREATE TABLE efood2022-357817.main_assessment.ck_query1
+AS 
+
+SELECT 
+city
+, COUNT(order_id) AS total_orders
+
+FROM `efood2022-357817.main_assessment.orders1` 
+GROUP BY 
+city
+HAVING COUNT(order_id) > 1000  -- All cities that exceed 1000 orders
+
+
+
+-- Breakfast orders
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query1_2;
+CREATE TABLE efood2022-357817.main_assessment.ck_query1_2
+AS 
+
+
+SELECT
+
+c.city
+, c.user_id 
+, c.amount_breakfast
+, c.orders_breakfast
+, CASE WHEN c.orders_breakfast > 3 THEN 1 ELSE 0 END AS orders_3_flag
+
+
+
+FROM 
+
+(SELECT 
+
+a.city
+, b.user_id
+, SUM(b.amount) AS amount_breakfast
+, COUNT(b.order_id) AS orders_breakfast
+
+
+FROM efood2022-357817.main_assessment.ck_query1 a
+LEFT JOIN 
+(SELECT * FROM `efood2022-357817.main_assessment.orders1` WHERE cuisine = 'Breakfast')  b
+ON a.city = b.city
+
+
+GROUP BY 
+a.city
+, b.user_id
+
+
+) c
+
+
+-- efood orders
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query1_3;
+CREATE TABLE efood2022-357817.main_assessment.ck_query1_3
+AS 
+
+
+SELECT
+
+c.city
+, c.user_id 
+, c.amount_efood
+, c.orders_efood
+, CASE WHEN c.orders_efood > 3 THEN 1 ELSE 0 END AS orders_3_flag_efood
+
+
+
+FROM 
+
+(SELECT 
+
+a.city
+, b.user_id
+, SUM(b.amount) AS amount_efood
+, COUNT(b.order_id) AS orders_efood
+
+
+FROM efood2022-357817.main_assessment.ck_query1 a
+LEFT JOIN  `efood2022-357817.main_assessment.orders1`  b
+ON a.city = b.city
+
+
+GROUP BY 
+a.city
+, b.user_id
+
+
+) c
+
+
+
+-- Both breakfast and efood orders
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query1_4;
+CREATE TABLE efood2022-357817.main_assessment.ck_query1_4
+AS 
+
+
+SELECT 
+c.city
+, c.total_amount_breakfast / c.total_orders_breakfast AS breakfast_basket
+, c.total_amount_efood / c.total_orders_efood AS efood_basket
+
+, c.total_orders_breakfast / c.total_users_breakfast AS breakfast_freq
+, c.total_orders_efood / c.total_users_efood AS efood_freq
+
+, c.users_3_breakfast / c.total_users_breakfast AS breakfast_users3freq_perc
+, c.users_3_efood / c.total_users_efood AS efood_users3freq_perc
+
+
+FROM 
+(SELECT 
+
+a.city
+, COUNT(a.user_id) AS total_users_breakfast
+, SUM(a.amount_breakfast)AS total_amount_breakfast
+, SUM(a.orders_breakfast) AS total_orders_breakfast
+, SUM(a.orders_3_flag) AS users_3_breakfast
+
+, COUNT(b.user_id) AS total_users_efood
+, SUM(b.amount_efood)AS total_amount_efood
+, SUM(b.orders_efood) AS total_orders_efood
+, SUM(b.orders_3_flag_efood) AS users_3_efood
+
+FROM efood2022-357817.main_assessment.ck_query1_2 a
+LEFT JOIN efood2022-357817.main_assessment.ck_query1_3 b
+ON a.city = b.city
+
+GROUP BY 
+a.city
+
+) c
+
+ORDER BY total_orders_breakfast DESC 
+limit 5
+
+
+
+SELECT * FROM efood2022-357817.main_assessment.ck_query1_4
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+-- Query 2
+
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query2;
+CREATE TABLE efood2022-357817.main_assessment.ck_query2
+AS 
+
+
+SELECT 
+a.city
+, a.user_id
+, a.total_orders
+, row_number() over (PARTITION BY  a.city ORDER BY a.total_orders DESC) AS rn 
+
+
+FROM 
+
+(SELECT 
+
+city
+, user_id
+, COUNT(order_id) AS total_orders
+
+FROM `efood2022-357817.main_assessment.orders1`  
+
+GROUP BY 
+city
+, user_id ) a
+
+
+
+DROP TABLE IF EXISTS efood2022-357817.main_assessment.ck_query2_1;
+CREATE TABLE efood2022-357817.main_assessment.ck_query2_1
+AS 
+
+SELECT 
+c.city
+, (c.total_orders_10 / c.total_orders ) * 100 AS orders_perc
+
+
+FROM 
+(
+SELECT 
+a.city
+, SUM(a.total_orders) AS total_orders_10
+, SUM(b.total_orders) AS total_orders
+
+FROM (SELECT * FROM efood2022-357817.main_assessment.ck_query2 WHERE rn <=10 ) a 
+LEFT JOIN 
+(SELECT 
+
+city
+, COUNT(order_id) AS total_orders
+
+FROM `efood2022-357817.main_assessment.orders1`  
+
+GROUP BY 
+city
+) b
+
+ON a.city = b.city
+
+GROUP BY a.city ) c
+
+
+
